@@ -77,3 +77,20 @@ putIntoMaze maze updates = foldl applyUpdate maze updates where
 
 getPart :: Maze -> (Int, Int) -> (Int, Int) -> Maze
 getPart maze (startRow, startCol) (height, width) = take height (map (take width . drop startCol) (drop startRow maze))
+
+getNeighbours (ri, ci) = [(ri - 1, ci),(ri + 1, ci), (ri, ci - 1), (ri, ci + 1)]
+
+solve [] _ = []
+solve ((ri, ci, price):toSolve) nowEmpty = let
+    allNeighbours = [n | n <- getNeighbours (ri, ci), elem n nowEmpty]
+    newEmpty = [n | n <- nowEmpty, notElem n allNeighbours]
+    in (ri, ci, price) : solve (toSolve ++ [(r, c, price + 1) | (r, c) <- allNeighbours]) newEmpty
+
+solveMaze :: Maze -> Int
+solveMaze maze = let
+    indexes = concat[[(ri, ci, ch) | (ci, ch) <- zip[0..] line] | (ri, line) <- zip[0..] maze]
+    (sr, sc) = head[(ri, ci) | (ri, ci, ch) <- indexes, ch == 's']
+    (er, ec) = head[(ri, ci) | (ri, ci, ch) <- indexes, ch == 'e']
+    empty = [(ri, ci) | (ri, ci, ch) <- indexes, ch == ' ' || ch == 'e']
+    solved = solve [(sr, sc, 0)] empty
+    in head [price | (r, c, price) <- solved, r == er, c == ec]
