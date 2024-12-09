@@ -1,3 +1,6 @@
+import Data.List (minimumBy)
+import Data.Function (on)
+
 type Maze = [String]
 
 sample1 :: Maze
@@ -19,54 +22,8 @@ sample2 = ["       ",
            "       ",
            "       "]
 
-sample3 :: Maze
-sample3 = ["  * *  ",
-           " ##### ",
-           "  ***  ",
-           "  * *  ",
-           "  ***  ",
-           "     * ",
-           "       "]
-
-sample4 :: Maze
-sample4 = ["*********",
-           "*s*   *e*",
-           "* *   * *",
-           "* *   * *",
-           "*       *",
-           "******* *",
-           "        *",
-           "*********"]
-
-arrow :: Maze
-arrow = [ "....#....",
-          "...###...",
-          "..#.#.#..",
-          ".#..#..#.",
-          "....#....",
-          "....#....",
-          "....#####"]
-
 printMaze :: Maze -> IO ()
 printMaze x = putStr (concat (map (++ "\n") x))
-
-above :: Maze -> Maze -> Maze
-above x y = x ++ y
-
-sideBySide :: Maze -> Maze -> Maze
-sideBySide = zipWith (++)
-
-toRow :: String -> Maze
-toRow xs = map (\x -> [x]) xs
-
-rotateR :: Maze -> Maze
-rotateR x = foldl1 sideBySide (reverse (map toRow x))
-
-rotateL :: Maze -> Maze
-rotateL x = foldl1 sideBySide (map (reverse.toRow) x)
-
-getFromMaze :: Maze -> (Int, Int) -> Char
-getFromMaze m (x, y) = (m !! x) !! y
 
 putIntoMaze :: Maze -> [(Int, Int, Char)] -> Maze
 putIntoMaze maze updates = foldl applyUpdate maze updates where
@@ -75,38 +32,27 @@ putIntoMaze maze updates = foldl applyUpdate maze updates where
                                             updatedRow = take col targetRow ++ [char] ++ drop (col + 1) targetRow
                                         in beforeRow ++ [updatedRow] ++ afterRow
 
-getPart :: Maze -> (Int, Int) -> (Int, Int) -> Maze
-getPart maze (startRow, startCol) (height, width) = take height (map (take width . drop startCol) (drop startRow maze))
+solveNum maze (x, y) end seen delka =
+    let above = if x - 1 >= 0 then (maze !! (x - 1)) !! y else '*'
+        below = if x + 1 < length maze then (maze !! (x + 1)) !! y else '*'
+        left  = if y - 1 >= 0 then (maze !! x) !! (y - 1) else '*'
+        right = if y + 1 < length (maze !! x) then (maze !! x) !! (y + 1) else '*'
+        test_above = if (x - 1, y) == end then end : (x, y) : seen
+                     else if above == ' ' && (x - 1, y) `notElem` seen then solveNum maze (x - 1, y) end ((x, y) : seen) (delka + 1)
+                     else []
+        test_below = if (x + 1, y) == end then end : (x, y) : seen
+                     else if below == ' ' && (x + 1, y) `notElem` seen then solveNum maze (x + 1, y) end ((x, y) : seen) (delka + 1)
+                     else []
+        test_left = if (x, y - 1) == end then end : (x, y) : seen
+                    else if left == ' ' && (x, y - 1) `notElem` seen then solveNum maze (x, y - 1) end ((x, y) : seen) (delka + 1)
+                    else []
+        test_right = if (x, y + 1) == end then end : (x, y) : seen
+                     else if right == ' ' && (x, y + 1) `notElem` seen then solveNum maze (x, y + 1) end ((x, y) : seen) (delka + 1)
+                     else []
+    in if (delka > (length maze * length (maze !! 0))) || all null [test_above, test_below, test_left, test_right]
+       then []
+       else minimumBy (compare `on` length) [n | n <- [test_above, test_below, test_left, test_right], not (null n)]
 
-getNeighbours (ri, ci) = [(ri - 1, ci),(ri + 1, ci), (ri, ci - 1), (ri, ci + 1)]
-
-solve [] _ = []
-solve ((ri, ci, price):toSolve) nowEmpty = let
-    allNeighbours = [n | n <- getNeighbours (ri, ci), elem n nowEmpty]
-    newEmpty = [n | n <- nowEmpty, notElem n allNeighbours]
-    in (ri, ci, price) : solve (toSolve ++ [(r, c, price + 1) | (r, c) <- allNeighbours]) newEmpty
-
-solveMaze :: Maze -> Int
-solveMaze maze = let
-    indexes = concat[[(ri, ci, ch) | (ci, ch) <- zip[0..] line] | (ri, line) <- zip[0..] maze]
-    (sr, sc) = head[(ri, ci) | (ri, ci, ch) <- indexes, ch == 's']
-    (er, ec) = head[(ri, ci) | (ri, ci, ch) <- indexes, ch == 'e']
-    empty = [(ri, ci) | (ri, ci, ch) <- indexes, ch == ' ' || ch == 'e']
-    solved = solve [(sr, sc, 0)] empty
-    in head [price | (r, c, price) <- solved, r == er, c == ec]
-
-solve' [] _ = []
-solve' ((ri, ci, price):toSolve) nowEmpty = let
-    allNeighbours = [n | n <- getNeighbours (ri, ci), elem n nowEmpty]
-    newEmpty = [n | n <- nowEmpty, notElem n allNeighbours]
-    updatedSolve = toSolve ++ [(r, c, price + 1) | (r, c) <- allNeighbours]
-    uniqueSolve = filter (\(r, c, p) -> notElem (r, c) (map (\(xr, xc, _) -> (xr, xc)) toSolve)) updatedSolve
-    in (ri, ci, price) : solve' (toSolve ++ uniqueSolve) newEmpty
-                                         
 makePath :: Maze -> (Int, Int) -> (Int, Int) -> Maze
-makePath maze (sr, sc) (er, ec) = let
-    indexes = concat[[(ri, ci, ch) | (ci, ch) <- zip[0..] line] | (ri, line) <- zip[0..] maze]
-    empty = [(ri, ci) | (ri, ci, ch) <- indexes, ch == ' ']
-    solved = solve' [(sr, sc, 0)] empty
-    in putIntoMaze maze [(r, c, 'x') | (r, c, _) <- solved]
-    
+makePath maze start end = let path = reverse (solveNum maze start end [] 0)
+                          in putIntoMaze maze [(fst (path !! i), snd (path !! i), head (show (i `mod` 10))) | i <- [0..length path -1]]
