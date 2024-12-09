@@ -10,87 +10,25 @@ sample1 = ["*********",
            "        *",
            "*********"]
 
-sample2 :: Maze
-sample2 = ["       ",
-           "       ",
-           "  ***  ",
-           "  ***  ",
-           "  ***  ",
-           "       ",
-           "       "]
-
-sample3 :: Maze
-sample3 = ["  * *  ",
-           " ##### ",
-           "  ***  ",
-           "  * *  ",
-           "  ***  ",
-           "     * ",
-           "       "]
-
-sample4 :: Maze
-sample4 = ["*********",
-           "*s*   *e*",
-           "* *   * *",
-           "* *   * *",
-           "*       *",
-           "******* *",
-           "        *",
-           "*********"]
-
-arrow :: Maze
-arrow = [ "....#....",
-          "...###...",
-          "..#.#.#..",
-          ".#..#..#.",
-          "....#....",
-          "....#....",
-          "....#####"]
-
 printMaze :: Maze -> IO ()
 printMaze x = putStr (concat (map (++ "\n") x))
-
-above :: Maze -> Maze -> Maze
-above x y = x ++ y
-
-sideBySide :: Maze -> Maze -> Maze
-sideBySide = zipWith (++)
-
-toRow :: String -> Maze
-toRow xs = map (\x -> [x]) xs
-
-rotateR :: Maze -> Maze
-rotateR x = foldl1 sideBySide (reverse (map toRow x))
-
-rotateL :: Maze -> Maze
-rotateL x = foldl1 sideBySide (map (reverse.toRow) x)
-
-getFromMaze :: Maze -> (Int, Int) -> Char
-getFromMaze m (x, y) = (m !! x) !! y
-
-putIntoMaze :: Maze -> [(Int, Int, Char)] -> Maze
-putIntoMaze maze updates = foldl applyUpdate maze updates where
-    applyUpdate :: Maze -> (Int, Int, Char) -> Maze
-    applyUpdate maze (row, col, char) = let (beforeRow, targetRow:afterRow) = splitAt row maze
-                                            updatedRow = take col targetRow ++ [char] ++ drop (col + 1) targetRow
-                                        in beforeRow ++ [updatedRow] ++ afterRow
 
 getPart :: Maze -> (Int, Int) -> (Int, Int) -> Maze
 getPart maze (startRow, startCol) (height, width) = take height (map (take width . drop startCol) (drop startRow maze))
 
-getNeighbours (ri, ci) = [(ri - 1, ci),(ri + 1, ci), (ri, ci - 1), (ri, ci + 1)]
+minimaps :: Maze -> (Int, Int) -> [(Char, Int)] -> Maze
+minimaps maze startPos directions = concatMap createMinimap positionsWithTurns where
+    positionsWithTurns = scanl move startPos directions
 
-solve [] _ = []
-solve ((ri, ci, price):toSolve) nowEmpty = let
-    allNeighbours = [n | n <- getNeighbours (ri, ci), elem n nowEmpty]
-    newEmpty = [n | n <- nowEmpty, notElem n allNeighbours]
-    in (ri, ci, price) : solve (toSolve ++ [(r, c, price + 1) | (r, c) <- allNeighbours]) newEmpty
+    move (r, c) (dir, len) = let (deltaRow, deltaCol) = getDirections dir
+                             in (r + deltaRow * len, c + deltaCol * len)
+        
+    getDirections dir | dir == 'd' = (1, 0)
+                      | dir == 'u' = (-1, 0)
+                      | dir == 'l' = (0, -1)
+                      | dir == 'r' = (0, 1)
 
-solveMaze :: Maze -> Int
-solveMaze maze = let
-    indexes = concat[[(ri, ci, ch) | (ci, ch) <- zip[0..] line] | (ri, line) <- zip[0..] maze]
-    (sr, sc) = head[(ri, ci) | (ri, ci, ch) <- indexes, ch == 's']
-    (er, ec) = head[(ri, ci) | (ri, ci, ch) <- indexes, ch == 'e']
-    empty = [(ri, ci) | (ri, ci, ch) <- indexes, ch == ' ' || ch == 'e']
-    solved = solve [(sr, sc, 0)] empty
-    in head [price | (r, c, price) <- solved, r == er, c == ec]
+    createMinimap (r, c) = let minimap = getPart maze (r - 1, c - 1) (3, 3)
+                           in printMinimap minimap
+
+    printMinimap minimap = ["---"] ++ minimap ++ ["---"]        
